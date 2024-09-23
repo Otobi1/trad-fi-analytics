@@ -1,4 +1,10 @@
 **.json
+**.tfvars
+*.tfstate
+*.tfstate.*
+**.terraform
+**.terraform.lock.*
+**.json
 
 
 # Byte-compiled / optimized / DLL files
