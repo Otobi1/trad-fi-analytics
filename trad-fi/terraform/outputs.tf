@@ -1,7 +1,12 @@
 # Output the public IP address of the VM
+output "vm_name" {
+  description = "The name of the VM instance"
+  value       = google_compute_instance.airflow_dbt_vm.name
+}
+
 output "vm_public_ip" {
   description = "The public IP address of the VM"
-  value       = google_compute_instance.de-projects-orchestrator.network_interface[0].access_config[0].nat_ip
+  value       = google_compute_instance.airflow_dbt_vm.network_interface[0].access_config[0].nat_ip
 }
 
 # Output the name of the storage bucket

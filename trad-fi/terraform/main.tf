@@ -20,7 +20,7 @@ resource "google_compute_instance" "airflow_dbt_vm" {
 
   boot_disk {
     initialize_params {
-      image = "Ubuntu 20.04.LTS"
+      image = "ubuntu-os-cloud/ubuntu-2004-lts"
     }
   }
 
