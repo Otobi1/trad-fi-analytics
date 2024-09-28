@@ -48,13 +48,28 @@ resource "google_compute_instance" "airflow_dbt_vm" {
     pip3 install dbt-core dbt-bigquery
 
     # Clone the Git repository
-    git clone ${var.git_repo_url} /home/${var.project_id}/project-repo/
+    sudo git clone https://github.com/Otobi1/de-projects.git /home/liquid-kite-436018-c2/project-repo/
+
+    # Create Airflow DAGs directory if it doesn't exist
+    sudo mkdir -p /home/liquid-kite-436018-c2/airflow/dags/
 
     # Move Airflow DAGs to the appropriate directory
-    mv /home/${var.project_id}/project-repo/dags/* /home/${var.project_id}/airflow/dags/
+    if [ -d "/home/liquid-kite-436018-c2/project-repo/dags/" ]; then
+        sudo mv /home/liquid-kite-436018-c2/project-repo/dags/* /home/liquid-kite-436018-c2/airflow/dags/
+    else
+        echo "DAGs directory does not exist."
+    fi
+
+    # Create DBT projects directory if it doesn't exist
+    sudo mkdir -p /home/liquid-kite-436018-c2/dbt_projects/
 
     # Move DBT projects to the appropriate directory
-    mv /home/${var.project_id}/project-repo/dbt_projects/* /home/${var.project_id}/dbt_projects/
+    if [ -d "/home/liquid-kite-436018-c2/project-repo/dbt_projects/" ]; then
+        sudo mv /home/liquid-kite-436018-c2/project-repo/dbt_projects/* /home/liquid-kite-436018-c2/dbt_projects/
+    else
+        echo "DBT projects directory does not exist."
+    fi
+
   EOT
 }
 
