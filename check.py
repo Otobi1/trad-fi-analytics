@@ -8,6 +8,9 @@ import logging
 from google.cloud import storage
 
 client = storage.Client(project='liquid-kite-436018-c2')
+from google.cloud import storage
+
+client = storage.Client(project='liquid-kite-436018-c2')
 
 # 1. Setup logging configuration
 logging.basicConfig(
@@ -34,6 +37,8 @@ def read_tickers_from_spreadsheet(file_path, sheet_name=None):
     logging.info(f"Found {len(tickers)} tickers in the spreadsheet.")
     return tickers
 
+# 3. Function to find the last partition by year and month for a ticker in GCS
+def get_last_partition(bucket_name, parquet_dir, ticker):
 # 3. Function to find the last partition by year and month for a ticker in GCS
 def get_last_partition(bucket_name, parquet_dir, ticker):
     last_year = None
@@ -70,6 +75,11 @@ def get_last_partition(bucket_name, parquet_dir, ticker):
     else:
         logging.info(f"No existing data found for ticker: {ticker}")
 
+        last_month = max(months[last_year]) if months[last_year] else None
+        logging.info(f"Last partition for {ticker} found in GCS: Year={last_year}, Month={last_month}")
+    else:
+        logging.info(f"No existing data found for ticker: {ticker}")
+
     return last_year, last_month
 
 # 4. Function to get the last date from the most recent partition in GCS
@@ -94,7 +104,20 @@ def get_last_date_from_partition(bucket_name, parquet_dir, ticker, last_year, la
                 last_date = partition_data.index.max()
                 logging.info(f"Last date for ticker {ticker} from partition in GCS: {last_date}")
                 return last_date
+        # List objects in the partition to find the parquet file
+        bucket = client.bucket(bucket_name)
+        blobs = bucket.list_blobs(prefix=partition_path)
+
+        # Download the parquet file and read it
+        for blob in blobs:
+            if blob.name.endswith('.parquet'):
+                blob_data = blob.download_as_bytes()
+                partition_data = pd.read_parquet(blob_data)
+                last_date = partition_data.index.max()
+                logging.info(f"Last date for ticker {ticker} from partition in GCS: {last_date}")
+                return last_date
     except Exception as e:
+        logging.error(f"Error reading partition for {ticker} in GCS: {e}")
         logging.error(f"Error reading partition for {ticker} in GCS: {e}")
         return None
 
