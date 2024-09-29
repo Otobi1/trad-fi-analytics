@@ -18,6 +18,9 @@ resource "google_compute_instance" "airflow_dbt_vm" {
   name         = var.vm_name
   machine_type = var.machine_type
 
+  # Disable deletion protection
+  deletion_protection = false
+
   boot_disk {
     initialize_params {
       image = "ubuntu-os-cloud/ubuntu-2004-lts"
