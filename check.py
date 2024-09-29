@@ -5,6 +5,9 @@ import pyarrow.parquet as pq
 from datetime import datetime, timedelta
 import os
 import logging
+from google.cloud import storage
+
+client = storage.Client(project='liquid-kite-436018-c2')
 
 # 1. Setup logging configuration
 logging.basicConfig(
@@ -31,44 +34,73 @@ def read_tickers_from_spreadsheet(file_path, sheet_name=None):
     logging.info(f"Found {len(tickers)} tickers in the spreadsheet.")
     return tickers
 
-# 3. Function to find the last partition by year and month for a ticker
-def get_last_partition(parquet_dir, ticker):
+# 3. Function to find the last partition by year and month for a ticker in GCS
+def get_last_partition(bucket_name, parquet_dir, ticker):
     last_year = None
     last_month = None
-    ticker_path = os.path.join(parquet_dir, f'Ticker={ticker}')
+    ticker_prefix = f'{parquet_dir}/Ticker={ticker}'
     
-    if not os.path.exists(ticker_path):
-        logging.info(f"No existing data found for ticker: {ticker}")
-        return None, None
+    # List the objects in the bucket under the ticker directory
+    bucket = client.bucket(bucket_name)
+    blobs = bucket.list_blobs(prefix=ticker_prefix)
     
-    # Find the most recent year
-    years = [int(year_dir.split('=')[-1]) for year_dir in os.listdir(ticker_path) if year_dir.startswith('Year=')]
+    years = set()
+    months = {}
+
+    for blob in blobs:
+        blob_path = blob.name
+        if 'Year=' in blob_path and 'Month=' in blob_path:
+            # Extract year and month from the object path
+            parts = blob_path.split('/')
+            for part in parts:
+                if part.startswith('Year='):
+                    year = int(part.split('=')[-1])
+                    years.add(year)
+                    months[year] = []
+                if part.startswith('Month='):
+                    month = int(part.split('=')[-1])
+                    months[year].append(month)
+
     if years:
         last_year = max(years)
-        year_path = os.path.join(ticker_path, f'Year={last_year}')
-        months = [int(month_dir.split('=')[-1]) for month_dir in os.listdir(year_path) if month_dir.startswith('Month=')]
-        if months:
-            last_month = max(months)
-            logging.info(f"Last partition for {ticker} found: Year={last_year}, Month={last_month}")
-    
+        last_month = max(months[last_year]) if months[last_year] else None
+        logging.info(f"Last partition for {ticker} found in GCS: Year={last_year}, Month={last_month}")
+    else:
+        logging.info(f"No existing data found for ticker: {ticker}")
+
     return last_year, last_month
 
-# 4. Function to get the last date from the most recent partition
-def get_last_date_from_partition(parquet_dir, ticker, last_year, last_month):
+
+# 4. Function to get the last date from the most recent partition in GCS
+def get_last_date_from_partition(bucket_name, parquet_dir, ticker, last_year, last_month):
     if last_year is None or last_month is None:
         return None
     
-    partition_path = os.path.join(parquet_dir, f'Ticker={ticker}', f'Year={last_year}', f'Month={last_month}')
-    logging.info(f"Checking last date from partition: {partition_path}")
-    
+    partition_path = f'{parquet_dir}/Ticker={ticker}/Year={last_year}/Month={last_month}/'
+    logging.info(f"Checking last date from partition in GCS: {partition_path}")
+
     try:
-        partition_data = pd.read_parquet(partition_path)
-        last_date = partition_data.index.max()  # Get the last date in the partition
-        logging.info(f"Last date for ticker {ticker} from partition: {last_date}")
-        return last_date
+        # List objects in the partition to find the parquet file
+        bucket = client.bucket(bucket_name)
+        blobs = bucket.list_blobs(prefix=partition_path)
+
+        # Download the parquet file and read it
+        for blob in blobs:
+            if blob.name.endswith('.parquet'):
+                blob_data = blob.download_as_bytes()
+                partition_data = pd.read_parquet(blob_data)
+                last_date = partition_data.index.max()
+                logging.info(f"Last date for ticker {ticker} from partition in GCS: {last_date}")
+                return last_date
     except Exception as e:
-        logging.error(f"Error reading partition for {ticker}: {e}")
+        logging.error(f"Error reading partition for {ticker} in GCS: {e}")
         return None
+
+    return None
+
+# Example usage:
+bucket_name = 'trad-fi'
+parquet_dir = 'trad-fi/raw'  # GCS directory where partitioned Parquet files are stored
 
 # 5. Function to fetch and append data based on the last partition or date
 def fetch_and_append_data(ticker, parquet_dir, execution_date):
@@ -134,10 +166,10 @@ def update_all_tickers(parquet_dir, ticker_file, execution_date):
 # Example usage:
 
 # Directory where partitioned Parquet files are stored
-parquet_dir = 'historical_data'
+parquet_dir = 'gs://trad-fi/raw/' # 'historical_data'
 
 # File path to the spreadsheet with tickers (Excel or CSV)
-ticker_file = 'ticker.csv'  # Assumes the spreadsheet contains a "Ticker" column
+ticker_file = '/home/liquid-kite-436018-c2/project-repo/ticker.csv'  
 
 # Airflow-like execution date (passed in from the orchestrator)
 execution_date = datetime.now()
