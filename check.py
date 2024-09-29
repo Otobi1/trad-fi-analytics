@@ -6,8 +6,6 @@ from datetime import datetime, timedelta
 import os
 import logging
 from google.cloud import storage
-
-client = storage.Client(project='liquid-kite-436018-c2')
 from google.cloud import storage
 
 client = storage.Client(project='liquid-kite-436018-c2')
@@ -39,8 +37,6 @@ def read_tickers_from_spreadsheet(file_path, sheet_name=None):
 
 # 3. Function to find the last partition by year and month for a ticker in GCS
 def get_last_partition(bucket_name, parquet_dir, ticker):
-# 3. Function to find the last partition by year and month for a ticker in GCS
-def get_last_partition(bucket_name, parquet_dir, ticker):
     last_year = None
     last_month = None
     ticker_prefix = f'{parquet_dir}/Year='  # Start by listing years
@@ -70,11 +66,6 @@ def get_last_partition(bucket_name, parquet_dir, ticker):
 
     if years:
         last_year = max(years)
-        last_month = max(months[last_year]) if months[last_year] else None
-        logging.info(f"Last partition for {ticker} found in GCS: Year={last_year}, Month={last_month}")
-    else:
-        logging.info(f"No existing data found for ticker: {ticker}")
-
         last_month = max(months[last_year]) if months[last_year] else None
         logging.info(f"Last partition for {ticker} found in GCS: Year={last_year}, Month={last_month}")
     else:
