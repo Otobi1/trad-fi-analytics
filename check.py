@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 import os
 import logging
 from google.cloud import storage
-from google.cloud import storage
 
 client = storage.Client(project='liquid-kite-436018-c2')
 
@@ -32,11 +31,12 @@ def read_tickers_from_spreadsheet(file_path, sheet_name=None):
         raise ValueError("Unsupported file format. Use .xlsx or .csv files.")
     
     tickers = tickers_df['Ticker'].tolist()
-    logging.info(f"Found {len(tickers)} tickers in the spreadsheet.")
+    logging.info(f"Found {len(tickers)} tickers in the spreadsheet: {tickers}")
     return tickers
 
 # 3. Function to find the last partition by year and month for a ticker in GCS
 def get_last_partition(bucket_name, parquet_dir, ticker):
+    logging.info(f"Fetching last partition for {ticker} from GCS")
     last_year = None
     last_month = None
     ticker_prefix = f'{parquet_dir}/Year='  # Start by listing years
@@ -87,19 +87,6 @@ def get_last_date_from_partition(bucket_name, parquet_dir, ticker, last_year, la
         bucket = client.bucket(bucket_name)
         blobs = bucket.list_blobs(prefix=partition_path)
 
-        # Download the parquet file and read it
-        for blob in blobs:
-            if blob.name.endswith('.parquet'):
-                blob_data = blob.download_as_bytes()
-                partition_data = pd.read_parquet(blob_data)
-                last_date = partition_data.index.max()
-                logging.info(f"Last date for ticker {ticker} from partition in GCS: {last_date}")
-                return last_date
-        # List objects in the partition to find the parquet file
-        bucket = client.bucket(bucket_name)
-        blobs = bucket.list_blobs(prefix=partition_path)
-
-        # Download the parquet file and read it
         for blob in blobs:
             if blob.name.endswith('.parquet'):
                 blob_data = blob.download_as_bytes()
@@ -109,60 +96,57 @@ def get_last_date_from_partition(bucket_name, parquet_dir, ticker, last_year, la
                 return last_date
     except Exception as e:
         logging.error(f"Error reading partition for {ticker} in GCS: {e}")
-        logging.error(f"Error reading partition for {ticker} in GCS: {e}")
         return None
 
     return None
 
-
 # 5. Function to fetch and append data based on the last partition or date
 def fetch_and_append_data(bucket_name, ticker, parquet_dir, execution_date):
+    logging.info(f"Starting data fetch for ticker: {ticker}")
+    
     # Get the last partition for the given ticker
     last_year, last_month = get_last_partition(bucket_name, parquet_dir, ticker)
 
     # Get the last available date from the most recent partition
     last_date = get_last_date_from_partition(bucket_name, parquet_dir, ticker, last_year, last_month)
 
-    # If no existing data, fetch from the beginning of history
+    # Determine the start date for fetching data
     if last_date:
         start_date = (last_date + timedelta(days=1)).strftime('%Y-%m-%d')
     else:
-        start_date = '1900-01-01'  # Fetch full history if no data exists
+        start_date = '1991-01-01'  # Fetch full history if no data exists
 
-    # Set the end date based on the execution date passed by the orchestrator
     end_date = execution_date.strftime('%Y-%m-%d')
-    
     logging.info(f"Fetching data for {ticker} from {start_date} to {end_date}")
 
     # Fetch the data
-    stock = yf.Ticker(ticker)
-    new_data = stock.history(start=start_date, end=end_date)
+    try:
+        stock = yf.Ticker(ticker)
+        new_data = stock.history(start=start_date, end=end_date)
 
-    if not new_data.empty:
-        # Add partitioning columns
-        new_data['Year'] = new_data.index.year
-        new_data['Month'] = new_data.index.month
-        new_data['Day'] = new_data.index.day
-        new_data['Ticker'] = ticker
-        new_data['Sector'] = stock.info.get('sector', 'Unknown')
+        if not new_data.empty:
+            # Add partitioning columns
+            new_data['Year'] = new_data.index.year
+            new_data['Month'] = new_data.index.month
+            new_data['Ticker'] = ticker
+            logging.info(f"Retrieved {len(new_data)} rows for {ticker}")
 
-        logging.info(f"Retrieved {len(new_data)} rows for {ticker}")
-        
-        # Convert to pyarrow table
-        table = pa.Table.from_pandas(new_data)
-        logging.debug(f"Converted {ticker} data to PyArrow Table format")
+            # Convert to pyarrow table
+            table = pa.Table.from_pandas(new_data)
 
-        # Append the new data to the Parquet dataset (partitioned by Year, Month, Ticker)
-        pq.write_to_dataset(
-            table,
-            root_path=parquet_dir,
-            partition_cols=['Year', 'Month', 'Ticker']
-        )
-        
-        # Log the partition that was appended
-        logging.info(f"Appended new data to partition: Year={new_data['Year'].max()}, Month={new_data['Month'].max()}, Ticker={ticker}")
-    else:
-        logging.info(f"No new data for {ticker} since {last_date}.")
+            # Append the new data to the Parquet dataset (partitioned by Year, Month, Ticker)
+            pq.write_to_dataset(
+                table,
+                root_path=parquet_dir,
+                partition_cols=['Year', 'Month', 'Ticker']
+            )
+            
+            # Log the partition that was appended
+            logging.info(f"Appended new data to partition: Year={new_data['Year'].max()}, Month={new_data['Month'].max()}, Ticker={ticker}")
+        else:
+            logging.info(f"No new data for {ticker} since {last_date}.")
+    except Exception as e:
+        logging.error(f"Error fetching data for {ticker}: {e}")
 
 # 6. Main function to run the update process for all tickers
 def update_all_tickers(bucket_name, parquet_dir, ticker_file, execution_date):
@@ -178,8 +162,8 @@ def update_all_tickers(bucket_name, parquet_dir, ticker_file, execution_date):
 
 # Example usage:
 bucket_name = 'trad-fi'
-parquet_dir = 'gs://trad-fi/raw/'
-ticker_file = '/home/liquid-kite-436018-c2/project-repo/ticker.csv'
+parquet_dir = 'raw'
+ticker_file = '/home/tobi/de-projects/ticker.csv'
 execution_date = datetime.now()
 
 # Update all tickers
