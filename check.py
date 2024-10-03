@@ -11,19 +11,21 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 client = storage.Client(project='liquid-kite-436018-c2')
 
 
-# 1. Setup logging configuration
+# Logging Config (file and console)
 logging.basicConfig(
     level=logging.INFO, 
     format='%(asctime)s - %(levelname)s - %(message)s', 
     handlers=[
-        logging.FileHandler("ticker_data_update.log"),  # Log to a file
-        logging.StreamHandler()  # Log to console
+        logging.FileHandler("ticker_data_update.log"),  
+        logging.StreamHandler()  
     ]
 )
 
 
-# 2. Function to read tickers from an Excel or CSV file
 def read_tickers_from_spreadsheet(file_path, sheet_name=None):
+    '''
+        Read tickers from an Excel or CSV file.
+    '''
     logging.info(f"Reading tickers from file: {file_path}")
     if file_path.endswith('.xlsx'):
         tickers_df = pd.read_excel(file_path, sheet_name=sheet_name)
@@ -38,14 +40,17 @@ def read_tickers_from_spreadsheet(file_path, sheet_name=None):
     return tickers
 
 
-# 3. Function to find the last partition by year and month for a ticker in GCS
 def get_last_partition(bucket_name, parquet_dir, ticker):
+    '''
+        Find the last partition by year and month for a ticker in GCS.
+        List the years, then list the objects in the bucket from the base parquet directory.
+    '''
     logging.info(f"Fetching last partition for {ticker} from GCS")
     last_year = None
     last_month = None
-    ticker_prefix = f'{parquet_dir}/Year='  # Start by listing years
+    ticker_prefix = f'{parquet_dir}/Year=' 
     
-    # List the objects in the bucket starting from the base parquet directory
+   
     bucket = client.bucket(bucket_name)
     blobs = bucket.list_blobs(prefix=ticker_prefix)
     
@@ -77,13 +82,15 @@ def get_last_partition(bucket_name, parquet_dir, ticker):
 
     return last_year, last_month
 
-
-# 4. Function to get the last date from the most recent partition in GCS
+ 
 def get_last_date_from_partition(bucket_name, parquet_dir, ticker, last_year, last_month):
+    '''
+        Get the last date from the most recent partition in GCS.
+    '''
     if last_year is None or last_month is None:
         return None
     
-    # Path now structured as 'Year=YYYY/Month=MM/Ticker=<TICKER>'
+    # Partition path structured as - 'Year=YYYY/Month=MM/Ticker=<TICKER>'
     partition_path = f'{parquet_dir}/Year={last_year}/Month={last_month}/Ticker={ticker}/'
     logging.info(f"Checking last date from partition in GCS: {partition_path}")
 
@@ -106,9 +113,10 @@ def get_last_date_from_partition(bucket_name, parquet_dir, ticker, last_year, la
     return None
 
 
-#5
 def upload_to_gcs(bucket_name, local_file_path, gcs_file_path):
-    """Uploads a file from local storage to a GCS bucket."""
+    """
+    Uploads a file from local storage to a GCS bucket.
+    """
     logging.info(f"Uploading {local_file_path} to GCS bucket {bucket_name} at {gcs_file_path}")
     
     bucket = client.bucket(bucket_name)
@@ -118,8 +126,12 @@ def upload_to_gcs(bucket_name, local_file_path, gcs_file_path):
     logging.info(f"Successfully uploaded {local_file_path} to GCS at {gcs_file_path}")
 
 
-#6
 def fetch_and_append_data(bucket_name, ticker, parquet_dir, execution_date):
+    '''
+        Get data from yfinance.
+        Store locally, write to parquet, define GCS path, upload to GCS.
+        Remove parquet files from local.
+    '''
     logging.info(f"Starting data fetch for ticker: {ticker}")
     
     last_year, last_month = get_last_partition(bucket_name, parquet_dir, ticker)
@@ -148,24 +160,18 @@ def fetch_and_append_data(bucket_name, ticker, parquet_dir, execution_date):
             for (year, month), group in grouped:
                 logging.info(f"Processing data for {ticker} for Year={year}, Month={month}")
 
-                # Convert the group to a pyarrow table
                 table = pa.Table.from_pandas(group)
 
-                # Define local path for the parquet file
                 local_parquet_path = f'/tmp/{ticker}_{year}_{month}.parquet'
 
-                # Write the Parquet file locally first
                 pq.write_table(table, local_parquet_path)
 
-                # Define GCS path based on Year, Month, and Ticker
                 gcs_parquet_path = f'{parquet_dir}/Year={year}/Month={month}/Ticker={ticker}/{ticker}_{year}_{month}.parquet'
                 
-                # Upload the file to GCS
                 upload_to_gcs(bucket_name, local_parquet_path, gcs_parquet_path)
 
                 logging.info(f"Uploaded data to GCS: {gcs_parquet_path}")
 
-                # Optionally, delete the local file after upload
                 os.remove(local_parquet_path)
         else:
             logging.info(f"No new data for {ticker} since {last_date}.")
@@ -173,14 +179,15 @@ def fetch_and_append_data(bucket_name, ticker, parquet_dir, execution_date):
         logging.error(f"Error fetching data for {ticker}: {e}")
 
 
-# 7. Main function to run the update process for all tickers
 def update_all_tickers(bucket_name, parquet_dir, ticker_file, execution_date):
+    ''' 
+        Update all tickers, ingest and upload to GCS
+        Use ThreadpoolExecutor for parallel processing
+    '''
     logging.info(f"Starting update process for tickers from {ticker_file}")
     
-    # Read the list of tickers from the spreadsheet
     tickers = read_tickers_from_spreadsheet(ticker_file)
 
-    # Use ThreadPoolExecutor for parallel processing
     with ThreadPoolExecutor() as executor:
         future_to_ticker = {
             executor.submit(fetch_and_append_data, bucket_name, ticker, parquet_dir, execution_date): ticker
@@ -190,7 +197,7 @@ def update_all_tickers(bucket_name, parquet_dir, ticker_file, execution_date):
         for future in as_completed(future_to_ticker):
             ticker = future_to_ticker[future]
             try:
-                future.result()  # Check for exceptions during execution
+                future.result()  
                 logging.info(f"Successfully processed ticker: {ticker}")
             except Exception as e:
                 logging.error(f"Error processing ticker {ticker}: {e}")
