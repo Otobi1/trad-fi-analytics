@@ -198,7 +198,7 @@ def update_all_tickers(bucket_name, parquet_dir, ticker_file, execution_date):
 
 bucket_name = 'trad-fi'
 parquet_dir = 'raw'
-ticker_file = '/home/tobi/de-projects/ticker.csv'
+ticker_file = '/home/tobi/de-projects/sp_tickers.csv'
 execution_date = datetime.now()
 
 # Update all tickers
