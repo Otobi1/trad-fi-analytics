@@ -11,7 +11,8 @@ source as (
 renamed as (
 
     select
-        date, 
+        date,
+        FORMAT_TIMESTAMP('%Y-%m-%d', TIMESTAMP_SECONDS(CAST(CAST(date AS INT64) / 1000000000 AS INT64))) AS formatted_date,
         ticker,
         open,
         high,
