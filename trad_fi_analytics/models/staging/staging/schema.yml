@@ -1,0 +1,46 @@
+version: 2
+
+sources:
+  - name: staging
+    database: liquid-kite-436018-c2
+    schema: trad_fi_analytics
+
+    tables:
+      - name: raw_sp_500_check
+
+models:
+  - name: stg_staging__raw_sp_500_check
+    description: ""
+    columns:
+      - name: open
+        data_type: string
+
+      - name: high
+        data_type: string
+
+      - name: low
+        data_type: string
+
+      - name: close
+        data_type: string
+
+      - name: volume
+        data_type: string
+
+      - name: dividends
+        data_type: string
+
+      - name: stock_splits
+        data_type: string
+
+      - name: year
+        data_type: string
+
+      - name: month
+        data_type: string
+
+      - name: ticker
+        data_type: string
+
+      - name: date
+        data_type: string
