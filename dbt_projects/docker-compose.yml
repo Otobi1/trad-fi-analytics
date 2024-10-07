@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  dbt:
+    build: .
+    container_name: dbt_container
+    environment:
+      # Set environment variables for BigQuery
+      DBT_BIGQUERY_KEYFILE: /app/gcp-keyfile.json
+      DBT_PROJECT_ID: liquid-kite-436018-c2
+      DBT_DATASET: trad_fi_analytics
+    volumes:
+      - .:/app
+      - ./home/tobi/de-projects/keys/mycreds.json:/app/gcp-keyfile.json
+    command: ["dbt", "run"]
+
