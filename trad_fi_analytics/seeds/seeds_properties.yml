@@ -1,0 +1,5 @@
+version: 2
+
+seeds:
+  - name: sp_500_lookup
+    description: ""
