@@ -13,14 +13,13 @@ client = storage.Client(project='liquid-kite-436018-c2')
 
 # Logging Config (file and console)
 logging.basicConfig(
-    level=logging.INFO, 
-    format='%(asctime)s - %(levelname)s - %(message)s', 
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("ticker_data_update.log"),  
-        logging.StreamHandler()  
+        logging.FileHandler("ticker_data_update.log"),
+        logging.StreamHandler()
     ]
 )
-
 
 def read_tickers_from_spreadsheet(file_path, sheet_name=None):
     '''
@@ -181,8 +180,8 @@ def fetch_and_append_data(bucket_name, ticker, parquet_dir, execution_date):
 
 def update_all_tickers(bucket_name, parquet_dir, ticker_file, execution_date):
     ''' 
-        Update all tickers, ingest and upload to GCS
-        Use ThreadpoolExecutor for parallel processing
+        Update all tickers, ingest and upload to GCS.
+        Use ThreadpoolExecutor for parallel processing.
     '''
     logging.info(f"Starting update process for tickers from {ticker_file}")
     
