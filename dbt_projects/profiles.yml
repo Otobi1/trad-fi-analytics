@@ -1,0 +1,47 @@
+default:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account
+      project: 'liquid-kite-436018-c2'
+      dataset: 'trad_fi_analytics'
+      keyfile: '/home/tobi/de-projects/keys/mycreds.json'
+      threads: 1
+      timeout_seconds: 300
+      location: 'EU'
+
+
+
+# # profiles.yml
+
+# default:
+#   target: dev
+#   outputs:
+#     dev:
+#       type: bigquery
+#       method: service-account
+#       project: your-gcp-project-id         # GCP project ID
+#       dataset: your_bq_dataset             # BigQuery dataset
+#       keyfile: /app/gcp-keyfile.json       # Path to the service account key (inside Docker container)
+#       threads: 4                           # Number of threads dbt should use
+#       timeout_seconds: 300                 # Optional timeout
+#       location: US                         # BigQuery dataset location
+#       priority: interactive                # Optional: use 'batch' for batch processing
+#       retries: 1                           # Number of retries if a job fails
+#       maximum_bytes_billed: 1000000000000  # Optional limit on the amount of data scanned by queries
+
+# # Optionally, you can define other environments (e.g., prod)
+#     prod:
+#       type: bigquery
+#       method: service-account
+#       project: your-gcp-project-id-prod    # Prod project
+#       dataset: your_bq_prod_dataset        # Prod dataset
+#       keyfile: /app/gcp-keyfile.json
+#       threads: 4
+#       timeout_seconds: 300
+#       location: US
+#       priority: batch                      # Use batch priority for production
+#       retries: 3                           # Retry 3 times in production
+#       maximum_bytes_billed: 1000000000000
+
