@@ -125,23 +125,17 @@ def upload_to_gcs(bucket_name, local_file_path, gcs_file_path):
     logging.info(f"Successfully uploaded {local_file_path} to GCS at {gcs_file_path}")
 
 
-def fetch_and_append_data(bucket_name, ticker, parquet_dir, execution_date):
+def fetch_and_overwrite_data(bucket_name, ticker, parquet_dir, target_year, target_month):
     '''
-        Get data from yfinance.
-        Store locally, write to parquet, define GCS path, upload to GCS.
-        Remove parquet files from local.
+        Fetch data for a specific year and month from yfinance.
+        Overwrite existing data for that year and month in GCS.
     '''
-    logging.info(f"Starting data fetch for ticker: {ticker}")
+    logging.info(f"Starting data fetch for ticker: {ticker} for Year={target_year}, Month={target_month}")
     
-    last_year, last_month = get_last_partition(bucket_name, parquet_dir, ticker)
-    last_date = get_last_date_from_partition(bucket_name, parquet_dir, ticker, last_year, last_month)
-    
-    if last_date:
-        start_date = (last_date + timedelta(days=1)).strftime('%Y-%m-%d')
-    else:
-        start_date = '1991-01-01'
-    
-    end_date = execution_date.strftime('%Y-%m-%d')
+    # Define start and end dates for the specific month
+    start_date = f'{target_year}-{target_month:02d}-01'
+    end_date = (datetime(target_year, target_month, 1) + timedelta(days=32)).replace(day=1).strftime('%Y-%m-%d')
+
     logging.info(f"Fetching data for {ticker} from {start_date} to {end_date}")
     
     try:
@@ -154,8 +148,9 @@ def fetch_and_append_data(bucket_name, ticker, parquet_dir, execution_date):
             new_data['Ticker'] = ticker
             logging.info(f"Retrieved {len(new_data)} rows for {ticker}")
 
-            # Now group by Year and Month and store the data in GCS accordingly
+            # Group the data by Year and Month (should only be one group)
             grouped = new_data.groupby(['Year', 'Month'])
+
             for (year, month), group in grouped:
                 logging.info(f"Processing data for {ticker} for Year={year}, Month={month}")
 
@@ -166,37 +161,56 @@ def fetch_and_append_data(bucket_name, ticker, parquet_dir, execution_date):
                 pq.write_table(table, local_parquet_path)
 
                 gcs_parquet_path = f'{parquet_dir}/Year={year}/Month={month}/Ticker={ticker}/{ticker}_{year}_{month}.parquet'
-                
+
+                # Before uploading, delete any existing file for this year/month
+                delete_existing_files(bucket_name, parquet_dir, ticker, year, month)
+
                 upload_to_gcs(bucket_name, local_parquet_path, gcs_parquet_path)
 
                 logging.info(f"Uploaded data to GCS: {gcs_parquet_path}")
 
                 os.remove(local_parquet_path)
         else:
-            logging.info(f"No new data for {ticker} since {last_date}.")
+            logging.info(f"No new data for {ticker} in {target_year}-{target_month}.")
     except Exception as e:
         logging.error(f"Error fetching data for {ticker}: {e}")
 
 
-def update_all_tickers(bucket_name, parquet_dir, ticker_file, execution_date):
+def delete_existing_files(bucket_name, parquet_dir, ticker, year, month):
+    """
+    Delete existing files for a given ticker, year, and month in GCS.
+    """
+    logging.info(f"Deleting existing data for {ticker} for Year={year}, Month={month}")
+    
+    prefix = f'{parquet_dir}/Year={year}/Month={month}/Ticker={ticker}/'
+    
+    bucket = client.bucket(bucket_name)
+    blobs = bucket.list_blobs(prefix=prefix)
+    
+    for blob in blobs:
+        logging.info(f"Deleting {blob.name}")
+        blob.delete()
+
+
+def update_all_tickers(bucket_name, parquet_dir, ticker_file, target_year, target_month):
     ''' 
-        Update all tickers, ingest and upload to GCS.
-        Use ThreadpoolExecutor for parallel processing.
+        Update all tickers for a specific year and month, overwrite and upload to GCS.
+        Use ThreadPoolExecutor for parallel processing.
     '''
-    logging.info(f"Starting update process for tickers from {ticker_file}")
+    logging.info(f"Starting update process for tickers from {ticker_file} for Year={target_year}, Month={target_month}")
     
     tickers = read_tickers_from_spreadsheet(ticker_file)
 
     with ThreadPoolExecutor() as executor:
         future_to_ticker = {
-            executor.submit(fetch_and_append_data, bucket_name, ticker, parquet_dir, execution_date): ticker
+            executor.submit(fetch_and_overwrite_data, bucket_name, ticker, parquet_dir, target_year, target_month): ticker
             for ticker in tickers
         }
 
         for future in as_completed(future_to_ticker):
             ticker = future_to_ticker[future]
             try:
-                future.result()  
+                future.result()
                 logging.info(f"Successfully processed ticker: {ticker}")
             except Exception as e:
                 logging.error(f"Error processing ticker {ticker}: {e}")
@@ -205,7 +219,8 @@ def update_all_tickers(bucket_name, parquet_dir, ticker_file, execution_date):
 bucket_name = 'trad-fi'
 parquet_dir = 'raw'
 ticker_file = '/home/tobi/de-projects/sp_tickers.csv'
-execution_date = datetime.now()
+target_year = 2024
+target_month = 10
 
 # Update all tickers
-update_all_tickers(bucket_name, parquet_dir, ticker_file, execution_date)
+update_all_tickers(bucket_name, parquet_dir, ticker_file, target_year, target_month)
