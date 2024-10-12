@@ -1,2 +1,2 @@
-# de-projects
-Contains Data Engineering Projects
+
+![trad-fi analytics](image.png)
