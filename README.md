@@ -1,4 +1,31 @@
 
-![trad-fi analytics](image.png)
+![trad-fi analytics](image-1.png)
+
+[**Set up Infrastructure**](https://github.com/Otobi1/trad-fi-analytics/blob/master/terraform/main.tf)
+```
+terraform init
+terraform plan
+terraform apply 
+
+...
+terraform destroy
+
+[**Ingest Data into GCS**]()
+> Ingest partitioned data for the S & P tickers into GCS. 
+> First for the history, in this case starting from 1991-01-01 and afterwards for a specific month
+
+```
+python3 check.py
+python3 month.py
+
+
+[**Transform Data with DBT**](https://github.com/Otobi1/trad-fi-analytics/tree/master/trad_fi_analytics)
+> Model data
+> Implement necessary column transformations for data type conversions 
+> Create connection between dimension and fact table 
+> Write data to Bigquery
+
+
+[**Visualize in Looker**]
 
 [Looker Studio Dashboard](https://lookerstudio.google.com/reporting/fe89916d-4ae1-43af-ab59-a5ae0e003995/page/k1DFE)
