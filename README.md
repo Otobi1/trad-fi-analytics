@@ -1,4 +1,5 @@
 
+**Project Overview**
 ![trad-fi analytics](image-2.png)
 
 [**Set up Infrastructure**](https://github.com/Otobi1/trad-fi-analytics/blob/master/terraform/main.tf)
@@ -6,7 +7,7 @@
 terraform init
 terraform plan
 terraform apply 
-terraform destroy
+terraform destroy *(at the end of the project)*
 ```
 
 [**Ingest Data into GCS**](https://github.com/Otobi1/trad-fi-analytics/blob/master/Scripts/check.py)
@@ -25,3 +26,7 @@ python3 month.py
 > * Write data to Bigquery
 
 [**Visualize Looker Studio Dashboard**](https://lookerstudio.google.com/reporting/fe89916d-4ae1-43af-ab59-a5ae0e003995/page/k1DFE)
+
+**Limitations**
+> * Ingestion script is manually triggered; using a task scheduler would improve the overall usability.
+> * Transformations and publishing to Bigquery also manually triggered.
