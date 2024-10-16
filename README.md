@@ -28,5 +28,6 @@ python3 month.py
 [**Visualize Looker Studio Dashboard**](https://lookerstudio.google.com/reporting/fe89916d-4ae1-43af-ab59-a5ae0e003995/page/k1DFE)
 
 **Limitations**
-> * Ingestion script is manually triggered; using a task scheduler would improve the overall usability.
+> * Ingestion script is manually triggered.
 > * Transformations and publishing to Bigquery also manually triggered.
+> * Using a task scheduler or orchestrator such as self hosted or managed airflow (AWS, GCP Composer etc.,)  would improve the overall usability.
